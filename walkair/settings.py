@@ -42,7 +42,7 @@ INSTALLED_APPS = [
 
 STATIC_URL = '/static/'
 
-STATIC_ROOT = '/static/'
+STATIC_ROOT = 'static'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
