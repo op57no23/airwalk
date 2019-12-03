@@ -21,6 +21,7 @@ class SeleniumTests(StaticLiveServerTestCase):
         origin.send_keys("Ohlone Elementary School, 950 Amarillo Ave, Palo Alto, California 94303, United States of America")
         destination.send_keys("Ohlone Elementary School, 950 Amarillo Ave, Palo Alto, California 94303, United States of America")
         self.selenium.find_element_by_tag_name('button').click()
+        self.assertEqual(self.selenium.find_element_by_selector('ul li')[1].innerHTML, 'Time 0')
 
 
 ##Write a test case for gibberesh inputs and same origin and j
