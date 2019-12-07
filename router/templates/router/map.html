@@ -6,6 +6,7 @@
 				<title></title>
 				<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.0/mapbox-gl.js'></script>
 				<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.0/mapbox-gl.css' rel='stylesheet' />
+				<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 						<style>
 					  body {
 						margin: 0;
@@ -19,13 +20,16 @@
 					  }
 					  .search {
 						position:absolute;
-						z-index:1;
-						width:50%;
-						left:50%;
-						margin-left:-25%;
-						top:20px;
+						right:5%;
+						top:5%;
 						}
-						.mapboxgl-ctrl-geocoder { min-width:100%; }
+					  .results {
+						position: absolute;
+						top: 15%;
+						left: 0;
+						z-index: 1;
+						background-color: #fff;
+					  }
 					</style>
 		</head>
 		<body>
@@ -40,9 +44,26 @@
 				<div class = 'search'>
 						<form id = 'search' action="{% url 'route' %}">
 								{% csrf_token %}
+								<div class="container">
+										<div class="row" style="background-color:#fff">
+											<div class="col">
+													<div class="row"><div class="col">Origin</div></div>
+													<div class="row" id = "origin"></div>
+											</div>
+											<div class="col">
+													<div class="row"><div class="col">Destination</div></div>
+													<div class="row" id = 'destination'></div>
+											</div>
+										</div>
+										<div class="row" id = 'routebutton'></div>
+								</div>
 						</form>
 				</div>
-
+				<div class="results" style="display:none">
+						<div class="list-group">
+						
+						</div>
+				</div>
 				<script>
 						function getCookie(name) {
 								var cookieValue = null;
@@ -77,7 +98,7 @@
 						map = new mapboxgl.Map({
 								container: 'map',
 								style: 'mapbox://styles/mapbox/streets-v9',
-								center: [-122.1506, 37.446746],
+								center: [-122.28349, 37.8142],
 								zoom: 11
 						});
 
@@ -105,9 +126,13 @@
 								destAjax = e['result'];
 						})
 
-						$('#search').append(origin.onAdd(map));
-						$('#search').append(destination.onAdd(map));
-						$('#search').append('<button type = "submit">Find Route</button>');
+						$('#origin').append(origin.onAdd(map));
+						$('#destination').append(destination.onAdd(map));
+						$('.mapboxgl-ctrl-geocoder')[0].style.zIndex = 3;
+						$('.mapboxgl-ctrl-geocoder')[1].style.zIndex = 2;
+						$('.mapboxgl-ctrl-geocoder--input').first().attr('id','origin');
+						$('.mapboxgl-ctrl-geocoder--input').last().attr('id','destination');
+						$('#routebutton').append('<button class = "btn btn-primary" style = "position: relative; z-index:1" type = "submit">Find Route</button>');
 
 						map.on('load', function() {
 								map.addSource('blackcarbon', {
@@ -133,10 +158,11 @@
 
 						$('#search').on('submit', function(e) {
 								e.preventDefault();
-								let i = 0;
-								while (map.getLayer('route'+String(i))) {
-										map.removeLayer('route'+String(i));
-										map.removeSource('route'+String(i));
+								map.getCanvas().style.cursor = "progress";
+								i = 1;
+								while (map.getLayer('Route '+String(i))) {
+										map.removeLayer('Route '+String(i));
+										map.removeSource('Route '+String(i));
 										i++;
 								}
 								$.ajax({
@@ -147,6 +173,7 @@
 												destinationCoor: JSON.stringify(destAjax['geometry']['coordinates']) 
 										},
 										success: function(data) {
+												$('.results .list-group').empty();
 												var routes = [];
 												for (route of JSON.parse(data)) {
 														var line = turf.lineString(route.geometry.coordinates);
@@ -188,27 +215,34 @@
 														routeValues.push(average(carbonValues));
 														var line = JSON.parse(data)[j]['geometry']
 														map.addLayer({
-															'id': 'route' + j,
+															'id': 'Route ' + String(j + 1),
 															'type': 'line',
 															'source': {
 																	'type': 'geojson',
-																	'data': line 
+																	'data': line,
+																	'generateId': true
+															},
+															'paint': {
+																	'line-opacity': ["case", ["boolean", ["feature-state", "hover"], false], 1, .5],
+																	'line-width': ["case", ["boolean", ["feature-state", "hover"], false], 10, 5]
 															}
-														})
+														});
 														var bounds = route.reduce(function(bounds, coord) {
-														return bounds.extend(coord);
+															return bounds.extend(coord);
 														}, new mapboxgl.LngLatBounds(route[0], route[0]));
 
-														var popup = new mapboxgl.Popup({closeOnClick: false})
-															.setLngLat(turf.along(line, turf.length(line) / 2).geometry.coordinates)
-															.setHTML('<ul><li>Black Carbon Value: '+ routeValues[j] + '</li><li>Time ' + JSON.parse(data)[j].duration + '</li></ul>')
-															.addTo(map);
-
+														$('.results .list-group').append(
+																'<div class = "list-group-item" id = "listItem' + String(j+1) + '"><h3>Route ' +  String(j+1) + '</h3><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + time(JSON.parse(data)[j].duration) + '</li></ul></div>'
+		   )
 														map.fitBounds(bounds, {
 														padding: 20
 														})
 														j++;
+														addEventListner(j)
 											}
+											$('.results').attr('style', 'display:inline');
+											map.getCanvas().style.cursor = "grab";
+											
 										}
 								});
 						});
@@ -219,6 +253,31 @@
 										.setHTML('<b>Black Carbon (unit):</b> ' + e.features[0].properties.BlackCarbonValue + '<br> ' + e.features[0].properties.time)
 							.addTo(map);
 						});
+						
+						let hoveredRouteId = null;	
+						function addEventListner(routeNumber) {
+								map.on('mouseenter', 'Route ' + String(routeNumber), function(e) { 
+										hoveredRouteId = e.features[0].id;
+										map.setFeatureState({source: 'Route ' + String(routeNumber), id: e.features[0].id }, { hover: true});
+										$('#listItem' + String(routeNumber)).attr('class', 'list-group-item active')
+										}
+									);
+								map.on('mouseleave', 'Route ' + String(routeNumber), function() {
+										map.setFeatureState({source: 'Route ' + String(routeNumber), id: hoveredRouteId }, { hover: false});
+										$('#listItem' + String(routeNumber)).attr('class', 'list-group-item')
+								}
+								 );					
+								$('#listItem' + String(routeNumber)).hover(function(e) {
+									hoveredRouteId = routeNumber;
+									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: true});
+									$('#listItem' + String(routeNumber)).attr('class', 'list-group-item active');
+								   },
+								   function(e) {
+									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: false});
+									$('#listItem' + String(routeNumber)).attr('class', 'list-group-item');
+								   }
+								);
+						}
 
 						function average(arr) {
 								sum = 0;
@@ -227,6 +286,34 @@
 								}
 								return sum/arr.length;
 						}
+
+						function time(seconds) {
+								const hours = Math.floor(seconds/3600);
+								const minutes = Math.floor(seconds / 60);
+								if (hours > 0) {
+										if (hours === 1) {
+												if (minutes - 60 === 1) {
+														return "1 hour and 1 minute";
+												}
+												else {
+														return "One hour and " + String(minutes - 60) + " minutes"
+												}
+										}
+										else if (minutes - hours * 60 === 1) {
+												return String(hours) + " hours and 1 minute"
+												}
+										return String(hours) + " hours and " + String(minutes - hours * 60) + " minutes"
+								}
+								else {
+										if (minutes > 0) {
+												return String(minutes) + " minutes"
+										}
+										else {
+												return "1 minute"
+										}
+								}
+						}
+
 						function idw(pointArray) {
 								numerator = 0;
 								denominator = 0;
@@ -236,7 +323,8 @@
 								}
 								return numerator / denominator;
 						}
-										</script>
-
+				</script>
+				<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+				<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 		</body>
 </html>
