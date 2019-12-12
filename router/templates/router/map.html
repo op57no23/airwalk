@@ -55,7 +55,15 @@
 													<div class="row" id = 'destination'></div>
 											</div>
 										</div>
-										<div class="row" id = 'routebutton'></div>
+										<div class="row">
+											<div class="col">
+												<div class="btn-group">
+														<button class="btn btn-primary active" type = "button">Walk</button>
+														<button class="btn btn-secondary" type = "button">Cycle</button>
+												</div>
+											</div>
+										<div class="col" id = "routebutton"></div>
+										</div>
 								</div>
 						</form>
 				</div>
@@ -133,7 +141,6 @@
 						$('.mapboxgl-ctrl-geocoder--input').first().attr('id','origin');
 						$('.mapboxgl-ctrl-geocoder--input').last().attr('id','destination');
 						$('#routebutton').append('<button class = "btn btn-primary" style = "position: relative; z-index:1" type = "submit">Find Route</button>');
-
 						map.on('load', function() {
 								map.addSource('blackcarbon', {
 										type: 'geojson',
@@ -159,6 +166,7 @@
 						$('#search').on('submit', function(e) {
 								e.preventDefault();
 								map.getCanvas().style.cursor = "progress";
+								$('#routebutton .btn').html('<span class="spinner-border spinner-border-sm"></span>Find Route');
 								i = 1;
 								while (map.getLayer('Route '+String(i))) {
 										map.removeLayer('Route '+String(i));
@@ -242,7 +250,7 @@
 											}
 											$('.results').attr('style', 'display:inline');
 											map.getCanvas().style.cursor = "grab";
-											
+											$('#routebutton .btn').html('Find Route');
 										}
 								});
 						});
@@ -278,6 +286,11 @@
 								   }
 								);
 						}
+
+						$('.btn-group .btn').on('click', function() {
+							$('.btn-group .btn-primary.active').attr('class', "btn btn-secondary");
+							$(this).attr('class', "btn btn-primary active");
+						});
 
 						function average(arr) {
 								sum = 0;
