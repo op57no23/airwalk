@@ -7,13 +7,20 @@ import json
 # Create your views here.
 
 def index(request):
-    token = os.environ['TOKEN']
-    return render(request, 'router/map.html', {'token': token})
+    mapBoxToken = os.environ['MAPBOXTOKEN']
+    return render(request, 'router/map.html', {'token': mapBoxToken})
 
 def route(request):
     origin = json.loads(request.POST['originCoor'])
     destination = json.loads(request.POST['destinationCoor'])
-    token = os.environ['TOKEN']
-    res = requests.get(f'https://api.mapbox.com/directions/v5/mapbox/cycling/{origin[0]},{origin[1]};{destination[0]},{destination[1]}?access_token=pk.eyJ1IjoidXJiYW50aG9yZWF1IiwiYSI6ImNrM2MwbHozbzBlY3IzZW1hangwdDhqNWgifQ.YcoTSYtYcIcTYdBok-TZaQ&steps=true&alternatives=true&overview=full&geometries=geojson')
-    return JsonResponse(json.dumps(res.json()['routes']), safe = False)
+    modeTransport = request.POST['modeTransport']
+    if (modeTransport == 'Walk'):
+        modeTransport = 'foot'
+    else:
+        modeTransport = 'bike'
+    api_key = os.environ['TOKEN']
+    res = requests.get(f'https://graphhopper.com/api/1/route?point={origin[1]},{origin[0]}&point={destination[1]},{destination[0]}&vehicle={modeTransport}&key={api_key}&ch.disable=true&algorithm=alternative_route&alternative_route.max_paths=4&points_encoded=false')
+    return JsonResponse(res.json())
+
+
 

@@ -178,13 +178,14 @@
 										url: $(this).attr('action'),
 										data: {
 												originCoor: JSON.stringify(orAjax['geometry']['coordinates']),
-												destinationCoor: JSON.stringify(destAjax['geometry']['coordinates']) 
+												destinationCoor: JSON.stringify(destAjax['geometry']['coordinates']),
+												modeTransport: $('.btn-group .btn.btn-primary.active').html()
 										},
-										success: function(data) {
+										success: function(data) { 
 												$('.results .list-group').empty();
 												var routes = [];
-												for (route of JSON.parse(data)) {
-														var line = turf.lineString(route.geometry.coordinates);
+												for (route of data.paths) {
+														var line = turf.lineString(route.points.coordinates);
 														var arrayOfPoints = [];
 														for (i = 0; i < turf.length(line); i+=.25) {
 																arrayOfPoints.push(turf.along(line, i)['geometry']['coordinates']);
@@ -221,7 +222,7 @@
 																carbonValues.push(idw(nearest));
 												}
 														routeValues.push(average(carbonValues));
-														var line = JSON.parse(data)[j]['geometry']
+														var line = data['paths'][j]['points']
 														map.addLayer({
 															'id': 'Route ' + String(j + 1),
 															'type': 'line',
@@ -240,7 +241,7 @@
 														}, new mapboxgl.LngLatBounds(route[0], route[0]));
 
 														$('.results .list-group').append(
-																'<div class = "list-group-item" id = "listItem' + String(j+1) + '"><h3>Route ' +  String(j+1) + '</h3><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + time(JSON.parse(data)[j].duration) + '</li></ul></div>'
+																'<div class = "list-group-item" id = "listItem' + String(j+1) + '"><h3>Route ' +  String(j+1) + '</h3><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + time(data.paths[j].time/1000) + '</li></ul></div>'
 		   )
 														map.fitBounds(bounds, {
 														padding: 20
