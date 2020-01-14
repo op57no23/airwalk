@@ -18,19 +18,53 @@
 						bottom: 0;
 						width: 100%;
 					  }
+
 					  .search {
-						position:absolute;
-						right:5%;
-						top:5%;
-						}
-					  .results {
-						position: absolute;
-						top: 15%;
-						left: 0;
-						z-index: 1;
-						background-color: #fff;
+							  position: absolute;
 					  }
-					</style>
+
+					  .results {
+							position:absolute;
+							background-color: #fff;
+							z-index: 1;
+					  }
+					  
+					  @media (min-width: 320px) {
+							.search {
+									width: 100%;
+									top: 5%;
+							}
+							.results {
+									width: 100%;
+									bottom: 5%;
+							}
+					  }
+
+					  @media (min-width: 480px) {
+							  .search {
+									  width: 50%;
+										left: 5%;
+										top: 5%;
+							  }
+							  .results {
+									  width: 50%;
+										bottom: 5%;
+										left: 5%;
+							  }
+					  }
+
+					  @media (min-width: 801px) {
+								.search {
+								right:5%;
+								top:5%;
+								}
+							  .results {
+								top: 15%;
+								left: 5%;
+							  }
+
+					  }
+					  					</style>
 		</head>
 		<body>
 				<script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.4.2/mapbox-gl-geocoder.min.js'></script>
@@ -68,8 +102,7 @@
 						</form>
 				</div>
 				<div class="results" style="display:none">
-						<div class="list-group">
-						
+						<div id="accordion">
 						</div>
 				</div>
 				<script>
@@ -114,25 +147,33 @@
 								accessToken: mapboxgl.accessToken,
 								mapboxgl: mapboxgl,
 								trackProximity: true, 
-								flyTo: false,
-								bbox: [-123,37,-121,39]
+								flyTo: true,
+								bbox: [-123,37,-121,39],
+								reverseGeocode: true,
+								minLength: 1
 						});
 
 						var destination = new MapboxGeocoder ({
 								accessToken: mapboxgl.accessToken,
 								mapboxgl: mapboxgl,
 								trackProximity: true,
-								flyTo: false,
-								bbox: [-123,37,-121,39]
+								flyTo: true,
+								bbox: [-123,37,-121,39],
+								reverseGeocode: true,
+								minLength: 1
 						});
 						
 						origin.on('result', function(e) {
 								orAjax = e['result'];
 						})
 
+						origin.on('loading', clearMap);
+
 						destination.on('result', function(e) {
 								destAjax = e['result'];
 						})
+
+						destination.on('loading', clearMap);
 
 						$('#origin').append(origin.onAdd(map));
 						$('#destination').append(destination.onAdd(map));
@@ -152,13 +193,15 @@
 										source: 'blackcarbon',
 										paint: {
 												'circle-color': [
-														'interpolate', 
+														'interpolate-lab', 
 														['linear'], 
 														['get', 'BlackCarbonValue'],
-														-1.35, '#5af542', 
-														1.35, '#f59342',
-														3.35, '#f54251',
-														5.35, '#bc42f5']
+														-.5, '#00FF00',
+														.5, '#FFFD00',
+														1.5, '#FF7E00',
+														2.5, '#FF0000',
+														3.5, '#C700FF'
+														]
 												}
 								}, 'waterway-label');
 						})
@@ -167,12 +210,7 @@
 								e.preventDefault();
 								map.getCanvas().style.cursor = "progress";
 								$('#routebutton .btn').html('<span class="spinner-border spinner-border-sm"></span>Find Route');
-								i = 1;
-								while (map.getLayer('Route '+String(i))) {
-										map.removeLayer('Route '+String(i));
-										map.removeSource('Route '+String(i));
-										i++;
-								}
+								clearMap();	
 								$.ajax({
 										type:'post',
 										url: $(this).attr('action'),
@@ -182,10 +220,14 @@
 												modeTransport: $('.btn-group .btn.btn-primary.active').html()
 										},
 										success: function(data) { 
-												$('.results .list-group').empty();
 												var routes = [];
-												for (route of data.paths) {
-														var line = turf.lineString(route.points.coordinates);
+												for (route of data['routes']) {
+														var lngLat = google.maps.geometry.encoding.decodePath(route.overview_polyline.points);
+														var lngLatLine = [];
+														for (x of lngLat) {
+																lngLatLine.push([x.lat(), x.lng()]);
+														}
+														var line = turf.lineString(lngLatLine);
 														var arrayOfPoints = [];
 														for (i = 0; i < turf.length(line); i+=.25) {
 																arrayOfPoints.push(turf.along(line, i)['geometry']['coordinates']);
@@ -222,7 +264,6 @@
 																carbonValues.push(idw(nearest));
 												}
 														routeValues.push(average(carbonValues));
-														var line = data['paths'][j]['points']
 														map.addLayer({
 															'id': 'Route ' + String(j + 1),
 															'type': 'line',
@@ -236,13 +277,13 @@
 																	'line-width': ["case", ["boolean", ["feature-state", "hover"], false], 10, 5]
 															}
 														});
-														var bounds = route.reduce(function(bounds, coord) {
-															return bounds.extend(coord);
-														}, new mapboxgl.LngLatBounds(route[0], route[0]));
 
-														$('.results .list-group').append(
-																'<div class = "list-group-item" id = "listItem' + String(j+1) + '"><h3>Route ' +  String(j+1) + '</h3><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + time(data.paths[j].time/1000) + '</li></ul></div>'
-		   )
+														$('.results #accordion').append(
+																'<div class = "card" id = "card' + String(j) + '"><div class = "card-header"><button class="btn btn-secondary collapsed" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + '</div><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + data.routes[j].legs[0].duration.text + '</li></ul></button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body">' + instructionString(data.routes[j].legs[0].steps) + '</div></div></div>'
+		   );
+														var sw = data.routes[j].bounds['southwest']
+														var ne = data.routes[j].bounds['northeast']
+														var bounds = new mapboxgl.LngLatBounds(sw, ne);
 														map.fitBounds(bounds, {
 														padding: 20
 														})
@@ -259,7 +300,7 @@
 						map.on('click', 'bcarbon', function(e) {
 						  new mapboxgl.Popup()
 							.setLngLat(e.features[0].geometry.coordinates)
-										.setHTML('<b>Black Carbon (unit):</b> ' + e.features[0].properties.BlackCarbonValue + '<br> ' + e.features[0].properties.time)
+										.setHTML('<b>Black Carbon :</b> ' + e.features[0].properties.BlackCarbonValue)
 							.addTo(map);
 						});
 						
@@ -268,22 +309,22 @@
 								map.on('mouseenter', 'Route ' + String(routeNumber), function(e) { 
 										hoveredRouteId = e.features[0].id;
 										map.setFeatureState({source: 'Route ' + String(routeNumber), id: e.features[0].id }, { hover: true});
-										$('#listItem' + String(routeNumber)).attr('class', 'list-group-item active')
+										$('#card' + String(routeNumber - 1)).attr('class', 'card bg-primary text-white')
 										}
 									);
 								map.on('mouseleave', 'Route ' + String(routeNumber), function() {
 										map.setFeatureState({source: 'Route ' + String(routeNumber), id: hoveredRouteId }, { hover: false});
-										$('#listItem' + String(routeNumber)).attr('class', 'list-group-item')
+										$('#card' + String(routeNumber - 1)).attr('class', 'card')
 								}
 								 );					
-								$('#listItem' + String(routeNumber)).hover(function(e) {
+								$('#card' + String(routeNumber - 1)).hover(function(e) {
 									hoveredRouteId = routeNumber;
 									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: true});
-									$('#listItem' + String(routeNumber)).attr('class', 'list-group-item active');
+									$('#card' + String(routeNumber - 1)).attr('class', 'card bg-primary text-white');
 								   },
 								   function(e) {
 									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: false});
-									$('#listItem' + String(routeNumber)).attr('class', 'list-group-item');
+									$('#card' + String(routeNumber - 1)).attr('class', 'card');
 								   }
 								);
 						}
@@ -293,6 +334,16 @@
 							$(this).attr('class', "btn btn-primary active");
 						});
 
+						function clearMap() {
+								$('.results #accordion').empty();
+								i = 1;
+								while (map.getLayer('Route '+String(i))) {
+										map.removeLayer('Route '+String(i));
+										map.removeSource('Route '+String(i));
+										i++;
+								}
+						}
+
 						function average(arr) {
 								sum = 0;
 								for (i = 0; i < arr.length; i++) {
@@ -301,31 +352,13 @@
 								return sum/arr.length;
 						}
 
-						function time(seconds) {
-								const hours = Math.floor(seconds/3600);
-								const minutes = Math.floor(seconds / 60);
-								if (hours > 0) {
-										if (hours === 1) {
-												if (minutes - 60 === 1) {
-														return "1 hour and 1 minute";
-												}
-												else {
-														return "One hour and " + String(minutes - 60) + " minutes"
-												}
-										}
-										else if (minutes - hours * 60 === 1) {
-												return String(hours) + " hours and 1 minute"
-												}
-										return String(hours) + " hours and " + String(minutes - hours * 60) + " minutes"
+						function instructionString(instructionArray) {
+								output = "<ol>";
+								for (instruction of instructionArray) {
+										output += "<li>" + instruction.html_instructions + "<br>" + instruction.distance.text + "</li>";
 								}
-								else {
-										if (minutes > 0) {
-												return String(minutes) + " minutes"
-										}
-										else {
-												return "1 minute"
-										}
-								}
+								output += "</ol>";
+								return output;
 						}
 
 						function idw(pointArray) {
@@ -338,6 +371,7 @@
 								return numerator / denominator;
 						}
 				</script>
+				<script src="https://maps.googleapis.com/maps/api/js?key={{api_key}}&libraries=geometry"></script>
 				<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 				<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 		</body>

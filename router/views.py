@@ -8,18 +8,19 @@ import json
 
 def index(request):
     mapBoxToken = os.environ['MAPBOXTOKEN']
-    return render(request, 'router/map.html', {'token': mapBoxToken})
+    api_key = os.environ['TOKEN']
+    return render(request, 'router/map.html', {'api_key': api_key, 'token': mapBoxToken})
 
 def route(request):
     origin = json.loads(request.POST['originCoor'])
     destination = json.loads(request.POST['destinationCoor'])
     modeTransport = request.POST['modeTransport']
     if (modeTransport == 'Walk'):
-        modeTransport = 'foot'
+        modeTransport = 'walking'
     else:
-        modeTransport = 'bike'
+        modeTransport = 'bicycling'
     api_key = os.environ['TOKEN']
-    res = requests.get(f'https://graphhopper.com/api/1/route?point={origin[1]},{origin[0]}&point={destination[1]},{destination[0]}&vehicle={modeTransport}&key={api_key}&ch.disable=true&algorithm=alternative_route&alternative_route.max_paths=4&points_encoded=false')
+    res = requests.get(f'https://maps.googleapis.com/maps/api/directions/json?origin={origin[1]},{origin[0]}&destination={destination[1]},{destination[0]}&mode={modeTransport}&key={api_key}&alternatives=true')
     return JsonResponse(res.json())
 
 
