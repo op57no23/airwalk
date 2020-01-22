@@ -42,11 +42,12 @@
 					  @media (min-width: 320px) {
 							.search {
 									width: 100%;
-									max-height: 15%;
+									top: 0;
 							}
 							.results {
 									width: 100%;
 									max-height: 75%
+									bottom: 0;
 							}
 					  }
 
@@ -55,7 +56,6 @@
 									  width: auto;
 											  max-width: 60%;
 										left: 1%;
-												max-height:75%;
 							  }
 					  }
 
@@ -323,9 +323,9 @@
 														var sw = data.routes[j].bounds['southwest']
 														var ne = data.routes[j].bounds['northeast']
 														var bounds = new mapboxgl.LngLatBounds(sw, ne);
-														if (window.innerWidth > 320) {
+														if (window.innerWidth < 480) {
 																map.fitBounds(bounds, {
-																padding: {top: $('.search').height() + Math.floor(window.innerHeight * .03),
+																padding: {top: $('#search').height() + Math.floor(window.innerHeight * .03),
 																		bottom: $('.results').height() + Math.floor(window.innerHeight * .03),
 																right: Math.floor(window.innerWidth * .1),
 																left: Math.floor(window.innerWidth * .1)
@@ -333,7 +333,7 @@
 														}
 														else {
 																map.fitBounds(bounds, {
-																padding: {top: $('.search').height() + Math.floor(window.innerHeight * .03),
+																padding: {top: $('#search').height() + Math.floor(window.innerHeight * .03),
 																		bottom: $(Math.floor(window.innerHeight * .03)),
 																right: Math.floor(window.innerWidth * .1),
 																left: $('.results').width() + Math.floor(window.innerWidth * .05)
