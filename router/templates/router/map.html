@@ -13,56 +13,55 @@
 						padding: 0;
 					  }
 					  #map {
-						position: absolute;
+						position: fixed;
 						top: 0;
 						bottom: 0;
 						width: 100%;
 					  }
 
 					  .search {
-							  position: absolute;
+							  position: fixed;
+								top: 1%;
 					  }
 
 					  .results {
-							position:absolute;
+							position: fixed;
 							background-color: #fff;
-							z-index: 1;
+							bottom: 1%;
+							overflow: auto;
+					  }
+					  
+					  .card-header {
+							  background-color: gray;
+					  }
+					  
+					  .card-header.btn-secondary:focus {
+							  background-color: gray;
 					  }
 					  
 					  @media (min-width: 320px) {
 							.search {
 									width: 100%;
-									top: 5%;
+									max-height: 15%;
 							}
 							.results {
 									width: 100%;
-									bottom: 5%;
+									max-height: 75%
 							}
 					  }
 
 					  @media (min-width: 480px) {
-							  .search {
-									  width: 50%;
-										left: 5%;
-										top: 5%;
-							  }
 							  .results {
-									  width: 50%;
-										bottom: 5%;
-										left: 5%;
+									  width: auto;
+											  max-width: 60%;
+										left: 1%;
+												max-height:75%;
 							  }
 					  }
 
-					  @media (min-width: 801px) {
-								.search {
-								right:5%;
-								top:5%;
-								}
-							  .results {
-								top: 15%;
-								left: 5%;
-							  }
-
+					  .mapboxgl-ctrl-geocoder.mapboxgl-ctrl {
+							width: 100%;
+							max-width: 100%
 					  }
 					  					</style>
 		</head>
@@ -163,25 +162,52 @@
 								minLength: 1
 						});
 						
+						var orAjax;
+						var destAjax;
+
 						origin.on('result', function(e) {
 								orAjax = e['result'];
-						})
+								if ($('.mapboxgl-marker').length == 2) {
+										$('#routebutton button').attr('class', 'btn btn-primary');
+										$('#routebutton button').prop('disabled', false);
+								}
+								if (destAjax !==  undefined && orAjax.place_name === destAjax.place_name) {
+										clearMap(true);
+								}
+					})
+
+						origin.on('loading', function() {
+							clearMap(true);
+						});
 
 						origin.on('loading', clearMap);
 
 						destination.on('result', function(e) {
 								destAjax = e['result'];
+								if ($('.mapboxgl-marker').length == 2) {
+										$('#routebutton button').attr('class', 'btn btn-primary');
+										$('#routebutton button').prop('disabled', false);
+								}
+								if (orAjax !== undefined && orAjax.place_name === destAjax.place_name) {
+										clearMap(true);
+								}
 						})
 
-						destination.on('loading', clearMap);
-
+						destination.on('loading', function() {
+							clearMap(true);
+						});
+					
 						$('#origin').append(origin.onAdd(map));
 						$('#destination').append(destination.onAdd(map));
 						$('.mapboxgl-ctrl-geocoder')[0].style.zIndex = 3;
 						$('.mapboxgl-ctrl-geocoder')[1].style.zIndex = 2;
 						$('.mapboxgl-ctrl-geocoder--input').first().attr('id','origin');
 						$('.mapboxgl-ctrl-geocoder--input').last().attr('id','destination');
-						$('#routebutton').append('<button class = "btn btn-primary" style = "position: relative; z-index:1" type = "submit">Find Route</button>');
+						$('#routebutton').append('<button class = "btn btn-primary disabled" style = "position: relative; z-index:1" type = "submit">Find Route</button>');
+						$('#routebutton button').prop('disabled', true);
+						$('.mapboxgl-ctrl-geocoder--button').on('click', function() {
+								clearMap(true);
+						});
 						map.on('load', function() {
 								map.addSource('blackcarbon', {
 										type: 'geojson',
@@ -210,7 +236,7 @@
 								e.preventDefault();
 								map.getCanvas().style.cursor = "progress";
 								$('#routebutton .btn').html('<span class="spinner-border spinner-border-sm"></span>Find Route');
-								clearMap();	
+								clearMap(false);	
 								$.ajax({
 										type:'post',
 										url: $(this).attr('action'),
@@ -221,6 +247,7 @@
 										},
 										success: function(data) { 
 												var routes = [];
+												let j = 0;
 												for (route of data['routes']) {
 														var lngLat = google.maps.geometry.encoding.decodePath(route.overview_polyline.points);
 														var lngLatLine = [];
@@ -229,10 +256,24 @@
 														}
 														var line = turf.lineString(lngLatLine);
 														var arrayOfPoints = [];
-														for (i = 0; i < turf.length(line); i+=.25) {
+														for (i = 0; i < turf.length(line); i+=.2) {
 																arrayOfPoints.push(turf.along(line, i)['geometry']['coordinates']);
 														}
 														routes.push(arrayOfPoints);
+														map.addLayer({
+															'id': 'Route ' + String(j + 1),
+															'type': 'line',
+															'source': {
+																	'type': 'geojson',
+																	'data': line,
+																	'generateId': true
+															},
+															'paint': {
+																	'line-opacity': ["case", ["boolean", ["feature-state", "hover"], false], 1, .5],
+																	'line-width': ["case", ["boolean", ["feature-state", "hover"], false], 10, 5]
+															}
+														});
+														j += 1;
 												}
 												var json = (function () {
 																	var json = null;
@@ -248,14 +289,17 @@
 																	return json;
 												})();	
 												routeValues = []
-												let j = 0;
+												j = 0;
 												for(route of routes) {
 														carbonValues = [];
 														for (point of route) {
 																jsonCopy = JSON.parse(JSON.stringify(json))
 																nearest = [];
-																for (i = 0; i < 4; i++) {
-																		currentNearest = turf.nearest(point, jsonCopy)
+																for (i = 0; i < 5; i++) {
+																		currentNearest = turf.nearest(point, jsonCopy);
+																		if (turf.distance(currentNearest, point) > .25) {
+																				var outOfBounds = true;
+																		}
 																		nearest.push(currentNearest.properties);
 																		jsonCopy.features = jsonCopy.features.filter( function(feature) {
 																			return (feature.geometry.coordinates[0] != currentNearest.geometry.coordinates[0] && feature.geometry.coordinates[1] != currentNearest.geometry.coordinates[1]);
@@ -264,35 +308,54 @@
 																carbonValues.push(idw(nearest));
 												}
 														routeValues.push(average(carbonValues));
-														map.addLayer({
-															'id': 'Route ' + String(j + 1),
-															'type': 'line',
-															'source': {
-																	'type': 'geojson',
-																	'data': line,
-																	'generateId': true
-															},
-															'paint': {
-																	'line-opacity': ["case", ["boolean", ["feature-state", "hover"], false], 1, .5],
-																	'line-width': ["case", ["boolean", ["feature-state", "hover"], false], 10, 5]
-															}
-														});
-
-														$('.results #accordion').append(
-																'<div class = "card" id = "card' + String(j) + '"><div class = "card-header"><button class="btn btn-secondary collapsed" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + '</div><ul><li>Black Carbon Value: '+ routeValues[j].toFixed(3) + '</li><li>' + data.routes[j].legs[0].duration.text + '</li></ul></button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body">' + instructionString(data.routes[j].legs[0].steps) + '</div></div></div>'
+														
+														if (!outOfBounds) {
+															$('.results #accordion').append(
+																	'<div class = "card" id = "card' + String(j) + '"><button class="btn btn-secondary collapsed card-header" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + ': ' + routeValues[j].toFixed(3) + ' (µg/m3)</button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body"><h5 class="card-title">Black Carbon: '+ routeValues[j].toFixed(3) + ' (µg/m3).</h5><h6 class="card-subtitle">' + data.routes[j].legs[0].duration.text + '</h6><p>' + instructionString(data.routes[j].legs[0].steps) + '</p></div></div></div>'
 		   );
+																	
+														}
+														else {
+																$('.results #accordion').append(
+																		'<div class = "card" id = "card' + String(j) + '"><button class="btn btn-secondary collapsed card-header" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + ': ' + routeValues[j].toFixed(3) + ' (µg/m3)</button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body"><h5 class="card-title">Black Carbon: '+ routeValues[j].toFixed(3) + ' (µg/m3).</h5><h6 class="card-subtitle">This route goes outside of the bounds of the dataset; this black carbon value may not be reliable.</h6><h6 class="card-subtitle">' + data.routes[j].legs[0].duration.text + '</h6><p>' + instructionString(data.routes[j].legs[0].steps) + '</p></div></div></div>'
+		   );
+														}
 														var sw = data.routes[j].bounds['southwest']
 														var ne = data.routes[j].bounds['northeast']
 														var bounds = new mapboxgl.LngLatBounds(sw, ne);
-														map.fitBounds(bounds, {
-														padding: 20
-														})
-														j++;
+														if (window.innerWidth > 320) {
+																map.fitBounds(bounds, {
+																padding: {top: $('.search').height() + Math.floor(window.innerHeight * .03),
+																		bottom: $('.results').height() + Math.floor(window.innerHeight * .03),
+																right: Math.floor(window.innerWidth * .1),
+																left: Math.floor(window.innerWidth * .1)
+																}})
+														}
+														else {
+																map.fitBounds(bounds, {
+																padding: {top: $('.search').height() + Math.floor(window.innerHeight * .03),
+																		bottom: $(Math.floor(window.innerHeight * .03)),
+																right: Math.floor(window.innerWidth * .1),
+																left: $('.results').width() + Math.floor(window.innerWidth * .05)
+																}})
+
+														}
+																												j++;
 														addEventListner(j)
 											}
 											$('.results').attr('style', 'display:inline');
+											$('.card .btn').on('click', function() {
+													if ($(this).hasClass('collapsed')) {
+															$('.btn.btn-primary.card-header').attr('class', "btn btn-secondary collapsed card-header");
+															$(this).attr('class', "btn btn-primary card-header active");
+									}
+													else if ($(this).hasClass('active')) {
+															$(this).attr('class', "btn btn-secondary collapsed card-header");
+									}
+						});
+
 											map.getCanvas().style.cursor = "grab";
-											$('#routebutton .btn').html('Find Route');
+											$('#routebutton .btn').html('Find Routes');
 										}
 								});
 						});
@@ -300,8 +363,15 @@
 						map.on('click', 'bcarbon', function(e) {
 						  new mapboxgl.Popup()
 							.setLngLat(e.features[0].geometry.coordinates)
-										.setHTML('<b>Black Carbon :</b> ' + e.features[0].properties.BlackCarbonValue)
+										.setHTML('<b>Black Carbon :</b> ' + e.features[0].properties.BlackCarbonValue + ' (µg/m3)')
 							.addTo(map);
+						});
+
+						$('.btn-group .btn').on('click', function() {
+							if (!$(this).hasClass('active')) {
+								$('.btn-group .btn.active').attr('class', 'btn btn-secondary');
+								$(this).attr('class', 'btn btn-primary active');
+							}
 						});
 						
 						let hoveredRouteId = null;	
@@ -309,30 +379,41 @@
 								map.on('mouseenter', 'Route ' + String(routeNumber), function(e) { 
 										hoveredRouteId = e.features[0].id;
 										map.setFeatureState({source: 'Route ' + String(routeNumber), id: e.features[0].id }, { hover: true});
-										$('#card' + String(routeNumber - 1)).attr('class', 'card bg-primary text-white')
+										$('#card' + String(routeNumber - 1)).addClass('border-primary');
 										}
 									);
 								map.on('mouseleave', 'Route ' + String(routeNumber), function() {
 										map.setFeatureState({source: 'Route ' + String(routeNumber), id: hoveredRouteId }, { hover: false});
-										$('#card' + String(routeNumber - 1)).attr('class', 'card')
+										$('#card' + String(routeNumber - 1)).removeClass('border-primary');
 								}
 								 );					
 								$('#card' + String(routeNumber - 1)).hover(function(e) {
 									hoveredRouteId = routeNumber;
 									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: true});
-									$('#card' + String(routeNumber - 1)).attr('class', 'card bg-primary text-white');
+								$('#card' + String(routeNumber - 1)).addClass('border-primary');
 								   },
 								   function(e) {
 									map.setFeatureState({source: 'Route ' + String(routeNumber), id: 0}, { hover: false});
-									$('#card' + String(routeNumber - 1)).attr('class', 'card');
+								$('#card' + String(routeNumber - 1)).removeClass('border-primary');
 								   }
 								);
+								
 						}
 
-						$('.btn-group .btn').on('click', function() {
-							$('.btn-group .btn-primary.active').attr('class', "btn btn-secondary");
-							$(this).attr('class', "btn btn-primary active");
-						});
+
+						function clearMap(bool) {
+								$('.results #accordion').empty();
+								i = 1;
+								while (map.getLayer('Route '+String(i))) {
+										map.removeLayer('Route '+String(i));
+										map.removeSource('Route '+String(i));
+										i++;
+								}
+								if (bool) {
+										$('#routebutton button').prop('disabled', true);
+										$('#routebutton button').attr('class', 'btn btn-primary disabled');
+										}
+								}
 
 						function clearMap() {
 								$('.results #accordion').empty();
