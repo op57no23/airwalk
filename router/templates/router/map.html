@@ -37,9 +37,13 @@
 					  }
 					  
 					  .card-header.btn-secondary:focus {
-							  background-color: gray;
+							  background-color:gray;
 					  }
-					  
+
+					  .card-header.btn-secondary:hover {
+							  background-color:gray;
+					  }
+					
 					  @media (min-width: 320px) {
 							.search {
 									width: 100%;
@@ -329,19 +333,18 @@
 																		bottom: $('.results').height() + Math.floor(window.innerHeight * .03),
 																right: Math.floor(window.innerWidth * .1),
 																left: Math.floor(window.innerWidth * .1)
-																}})
+																}});
 														}
 														else {
 																map.fitBounds(bounds, {
 																padding: {top: $('#search').height() + Math.floor(window.innerHeight * .03),
-																		bottom: $(Math.floor(window.innerHeight * .03)),
+																		bottom: Math.floor(window.innerHeight * .03),
 																right: Math.floor(window.innerWidth * .1),
 																left: $('.results').width() + Math.floor(window.innerWidth * .05)
-																}})
-
+																}});
 														}
-																												j++;
-														addEventListner(j)
+														j++;
+														addEventListner(j);
 											}
 											$('.results').attr('style', 'display:inline');
 											$('.card .btn').on('click', function() {
@@ -414,16 +417,6 @@
 										$('#routebutton button').attr('class', 'btn btn-primary disabled');
 										}
 								}
-
-						function clearMap() {
-								$('.results #accordion').empty();
-								i = 1;
-								while (map.getLayer('Route '+String(i))) {
-										map.removeLayer('Route '+String(i));
-										map.removeSource('Route '+String(i));
-										i++;
-								}
-						}
 
 						function average(arr) {
 								sum = 0;
