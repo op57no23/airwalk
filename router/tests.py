@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from selenium.webdriver.chrome.webdriver import WebDriver 
+from selenium.webdriver.chrome.options import Options
 import time
 import pdb
 
@@ -9,7 +10,9 @@ class SeleniumTests(StaticLiveServerTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.selenium = WebDriver()
+        options = Options()
+        options.headless = True
+        cls.selenium = WebDriver(options = options)
         cls.selenium.implicitly_wait(10)
 
     @classmethod
