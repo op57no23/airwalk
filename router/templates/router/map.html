@@ -3,11 +3,11 @@
 		<head>
 				<meta charset="UTF-8">
 				<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
-				<title></title>
+				<title>Airwalk</title>
 				<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.0/mapbox-gl.js'></script>
 				<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.5.0/mapbox-gl.css' rel='stylesheet' />
 				<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-						<style>
+				<style>
 					  body {
 						margin: 0;
 						padding: 0;
@@ -52,6 +52,7 @@
 							.results {
 									width: 100%;
 									bottom: 0;
+									max-height: 90%;
 							}
 					  }
 
@@ -78,6 +79,8 @@
 				<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 				<script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
 				<div id='map'></div>
+
+
 				<div class = 'search'>
 						<form id = 'search' action="{% url 'route' %}">
 								{% csrf_token %}
@@ -99,16 +102,20 @@
 														<button class="btn btn-secondary" type = "button">Cycle</button>
 												</div>
 											</div>
-										<div class="col" id = "routebutton"></div>
+												<div class="col" id = "routebutton"></div>
 										</div>
 								</div>
 						</form>
 				</div>
+
+				
 				<div class="results" style="display:none">
 						<div id="accordion">
 						</div>
 				</div>
+
 				<script>
+				<!-- required for ajax to work with django csrf -->
 						function getCookie(name) {
 								var cookieValue = null;
 								if (document.cookie && document.cookie !== '') {
@@ -138,6 +145,8 @@
 								}
 						});
 
+				<!-- displaying map -->
+
 						mapboxgl.accessToken = '{{token}}';
 						map = new mapboxgl.Map({
 								container: 'map',
@@ -145,6 +154,8 @@
 								center: [-122.28349, 37.8142],
 								zoom: 11
 						});
+
+				<!-- adding geocoders -->
 
 						var origin = new MapboxGeocoder ({
 								accessToken: mapboxgl.accessToken,
@@ -166,6 +177,8 @@
 								minLength: 1
 						});
 						
+				<!-- disabling route button unless origin and destination have been set to unique locations -- >
+
 						var orAjax;
 						var destAjax;
 
@@ -200,7 +213,9 @@
 						destination.on('loading', function() {
 							clearMap(true);
 						});
-					
+		
+				<!-- adding geocoders to DOM -- >
+		
 						$('#origin').append(origin.onAdd(map));
 						$('#destination').append(destination.onAdd(map));
 						$('.mapboxgl-ctrl-geocoder')[0].style.zIndex = 3;
@@ -212,6 +227,9 @@
 						$('.mapboxgl-ctrl-geocoder--button').on('click', function() {
 								clearMap(true);
 						});
+
+				<!-- adding black carbon data to map -->
+
 						map.on('load', function() {
 								map.addSource('blackcarbon', {
 										type: 'geojson',
@@ -234,7 +252,13 @@
 														]
 												}
 								}, 'waterway-label');
+
+				<!-- adding about link to README.md to mapbox info -->
+
+								$('.mapboxgl-ctrl-attrib-inner').prepend('<a href="https://github.com/op57no23/airwalk">About This Site </a>');
 						})
+
+				<!-- handling route submission to the server -->
 
 						$('#search').on('submit', function(e) {
 								e.preventDefault();
@@ -253,17 +277,26 @@
 												var routes = [];
 												let j = 0;
 												for (route of data['routes']) {
+
+												<!--converting api data to turf linestring format>
+
 														var lngLat = google.maps.geometry.encoding.decodePath(route.overview_polyline.points);
 														var lngLatLine = [];
 														for (x of lngLat) {
 																lngLatLine.push([x.lng(), x.lat()]);
 														}
 														var line = turf.lineString(lngLatLine);
+
+												<!-- placing points along linestring -->
+
 														var arrayOfPoints = [];
 														for (i = 0; i < turf.length(line); i+=.2) {
 																arrayOfPoints.push(turf.along(line, i)['geometry']['coordinates']);
 														}
 														routes.push(arrayOfPoints);
+
+												<!-- drawing route on map -->
+
 														map.addLayer({
 															'id': 'Route ' + String(j + 1),
 															'type': 'line',
@@ -292,6 +325,9 @@
 																	});
 																	return json;
 												})();	
+												
+										<!-- scoring routes according to inverse distance weighting from black carbon dataset -->
+
 												routeValues = []
 												j = 0;
 												for(route of routes) {
@@ -301,6 +337,9 @@
 																nearest = [];
 																for (i = 0; i < 5; i++) {
 																		currentNearest = turf.nearest(point, jsonCopy);
+																
+																<!-- whether the route goes outside the bounds of the dataset -->
+
 																		if (turf.distance(currentNearest, point) > .25) {
 																				var outOfBounds = true;
 																		}
@@ -313,6 +352,8 @@
 												}
 														routeValues.push(average(carbonValues));
 														
+										<!-- adding results to DOM -->
+
 														if (!outOfBounds) {
 															$('.results #accordion').append(
 																	'<div class = "card" id = "card' + String(j) + '"><button class="btn btn-secondary collapsed card-header" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + ': ' + routeValues[j].toFixed(3) + ' (µg/m3)</button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body"><h5 class="card-title">Black Carbon: '+ routeValues[j].toFixed(3) + ' (µg/m3).</h5><h6 class="card-subtitle">' + data.routes[j].legs[0].duration.text + '</h6><p>' + instructionString(data.routes[j].legs[0].steps) + '</p></div></div></div>'
@@ -324,6 +365,8 @@
 																		'<div class = "card" id = "card' + String(j) + '"><button class="btn btn-secondary collapsed card-header" data-toggle="collapse" data-target="#collapse' + String(j) + '">' + data.routes[j].summary + ': ' + routeValues[j].toFixed(3) + ' (µg/m3)</button><div id = "collapse' + String(j) + '" class = "collapse" data-parent="#accordion"><div class = "card-body"><h5 class="card-title">Black Carbon: '+ routeValues[j].toFixed(3) + ' (µg/m3).</h5><h6 class="card-subtitle">This route goes outside of the bounds of the dataset; this black carbon value may not be reliable.</h6><h6 class="card-subtitle">' + data.routes[j].legs[0].duration.text + '</h6><p>' + instructionString(data.routes[j].legs[0].steps) + '</p></div></div></div>'
 		   );
 														}
+											<!-- changing map display based on route and screen size -->
+
 														var sw = data.routes[j].bounds['southwest']
 														var ne = data.routes[j].bounds['northeast']
 														var bounds = new mapboxgl.LngLatBounds(sw, ne);
@@ -344,9 +387,14 @@
 																}});
 														}
 														j++;
+
+												<!-- adds hover highlighting for routes and the corresponding results --> 
 														addEventListner(j);
 											}
 											$('.results').attr('style', 'display:inline');
+
+												<!-- accordion results switching active -->
+
 											$('.card .btn').on('click', function() {
 													if ($(this).hasClass('collapsed')) {
 															$('.btn.btn-primary.card-header').attr('class', "btn btn-secondary collapsed card-header");
@@ -357,11 +405,15 @@
 									}
 						});
 
+										<!-- resetting cursors -->	
+
 											map.getCanvas().style.cursor = "grab";
 											$('#routebutton .btn').html('Find Routes');
 										}
 								});
 						});
+
+				<!-- pop-ups for individual points of dataset -->
 
 						map.on('click', 'bcarbon', function(e) {
 						  new mapboxgl.Popup()
@@ -369,6 +421,8 @@
 										.setHTML('<b>Black Carbon :</b> ' + e.features[0].properties.BlackCarbonValue + ' (µg/m3)')
 							.addTo(map);
 						});
+
+				<!-- toggling walk and cycle option for route submission -->
 
 						$('.btn-group .btn').on('click', function() {
 							if (!$(this).hasClass('active')) {
@@ -378,6 +432,9 @@
 						});
 						
 						let hoveredRouteId = null;	
+
+				<!-- route highlighting for hovering -->
+
 						function addEventListner(routeNumber) {
 								map.on('mouseenter', 'Route ' + String(routeNumber), function(e) { 
 										hoveredRouteId = e.features[0].id;
@@ -404,6 +461,8 @@
 						}
 
 
+				<!-- clears map and results when altering origin and destination in geocoder -->
+
 						function clearMap(bool) {
 								$('.results #accordion').empty();
 								i = 1;
@@ -426,6 +485,8 @@
 								return sum/arr.length;
 						}
 
+		<!-- formats instruction string from google api to be displayed as result -->
+
 						function instructionString(instructionArray) {
 								output = "<ol>";
 								for (instruction of instructionArray) {
@@ -434,6 +495,8 @@
 								output += "</ol>";
 								return output;
 						}
+
+		<!-- inverse distance weighting for an array of points, using square of distance -->
 
 						function idw(pointArray) {
 								numerator = 0;
