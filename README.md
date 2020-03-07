@@ -1,4 +1,4 @@
-# Airwalk -- pollution routing: [https://morning-reef-21847.herokuapp.com/](https://morning-reef-21847.herokuapp.com/) 
+# [Airwalk](https://morning-reef-21847.herokuapp.com/) 
 
 Research has shown that air pollution can vary dramatically within short distances. Airwalk gives users the ability to choose walking and cycling routes based on street level pollution data. The site uses [data from aqdatacommons](https://aqdatacommons.org/superset/dashboard/bay_area_mobile_analysis/), routing from the Google Directions API, rendering from the Mapbox API, and calculating from the Turf js library to score and display routes. Although data is not real-time and only covers certain Bay Area neighborhoods, the site is a proof of concept for similar applications of this type of data.
 
