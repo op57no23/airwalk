@@ -29,7 +29,7 @@ jupyter-core==4.6.1
 MarkupSafe==1.1.1
 mistune==0.8.4
 more-itertools==7.2.0
-notebook==6.0.1
+notebook==6.4.12
 pandocfilters==1.4.2
 parso==0.5.1
 pexpect==4.7.0
